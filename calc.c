@@ -166,11 +166,14 @@ void *adder(void *arg)
 void *multiplier(void *arg)
 {
 	int bufferlen;
+	int changed;
 	int value1, value2;
 	int startOffset, remainderOffset;
 	int i;
 
-	return NULL; /* remove this line */
+	char nstring[50];
+
+	//return NULL; /* remove this line */
 
 	while (1)
 	{
@@ -233,10 +236,13 @@ void *multiplier(void *arg)
 
 		// something missing?
 		/* Step 3: free the lock */
-
+		pthread_mutex_unlock(&buffer_lock);
 		/* Step 6: check progress */
-
+		sem_wait(&progress_lock);
+		progress.add = changed ? 2 : 1;
+		sem_post(&progress_lock);
 		/* Step 5: let others play */
+		sched_yield();
 	}
 }
 
