@@ -129,8 +129,8 @@ void *adder(void *arg)
 
 				int2string(result, nstring);
 
-				//char BufferBackup[500];
-				//strcpy(BufferBackup, &buffer);
+				char BufferBackup[500];
+				strcpy(BufferBackup, &buffer);
 
 				strcpy(buffer + startOffset, &nstring);
 
