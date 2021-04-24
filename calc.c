@@ -138,7 +138,7 @@ void *adder(void *arg)
 				strcpy(buffer + (startOffset + strlen(nstring)), &BufferBackup[remainderOffset]);
 
 				bufferlen = bufferlen - (remainderOffset - 1 - startOffset); //5(35+5)-6  < So: 2 rm:6
-				i = remainderOffset - 1;									 ///2+4*6*9 [i=6] > 2+24*9 [i=3 *] >
+				i = startOffset - 1;									 ///2+4*6*9 [i=6] > 2+24*9 [i=3 *] >
 
 				changed = 1;
 				num_ops++;
@@ -447,7 +447,7 @@ int smp3_main(int argc, char **argv)
 	pthread_detach(multiplierThread);
 	pthread_detach(adderThread);
 	pthread_detach(degrouperThread);
-	pthread_detach(sentinelThread);
+	//pthread_detach(sentinelThread);
 	pthread_detach(readerThread);
 	/* Step 1: we have to join on the ________ thread. */
 	// pthread_join(____, NULL);
