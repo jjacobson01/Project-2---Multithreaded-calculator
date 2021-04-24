@@ -138,7 +138,7 @@ void *adder(void *arg)
 				strcpy(buffer + (startOffset + strlen(nstring)), &BufferBackup[remainderOffset]);
 
 				bufferlen = bufferlen - (remainderOffset - 1 - startOffset); //5(35+5)-6  < So: 2 rm:6
-				i = startOffset - 1;									 ///2+4*6*9 [i=6] > 2+24*9 [i=3 *] >
+				i = startOffset - 1;										 ///2+4*6*9 [i=6] > 2+24*9 [i=3 *] >
 
 				changed = 1;
 				num_ops++;
@@ -251,17 +251,21 @@ void *multiplier(void *arg)
    "(56)"] in the buffer and, if found, removes the parentheses leaving
    only the surrounded number. */
 void *degrouper(void *arg)
+
 {
+	int startOffset;
+	int remainderOffset;
 	int bufferlen;
+	int changed;
 	int i;
 
-	return NULL; /* remove this line */
+	//return NULL; /* remove this line */
 
 	while (1)
 	{
 
 		/* Step 3: add mutual exclusion */
-
+		pthread_mutex_lock(&buffer_lock);
 		if (timeToFinish())
 		{
 			return NULL;
@@ -274,16 +278,57 @@ void *degrouper(void *arg)
 		for (i = 0; i < bufferlen; i++)
 		{
 			// check for '(' followed by a naked number followed by ')'
-			// remove ')' by shifting the tail end of the expression
-			// remove '(' by shifting the beginning of the expression
+			if (buffer[i] == '(')
+			{
+				startOffset = i;
+
+				if (!isNumeric(buffer[i + 1]))
+				{
+					continue;
+				}
+
+				do
+				{
+					i++;
+				} while (isNumeric(buffer[i]));
+				//printf(buffer+i);
+				;
+				if (buffer[i] == ')')
+				{ 
+					remainderOffset = i;
+					// remove ')' by shifting the tail end of the expression
+					// remove '(' by shifting the beginning of the expression
+					char BufferBackup[500];
+					strcpy(BufferBackup, &buffer);
+
+
+					strcpy(buffer + (startOffset), buffer + (startOffset + 1));
+
+					strcpy(buffer + remainderOffset - 1, buffer + (remainderOffset)); 
+
+
+					bufferlen = bufferlen - 2;
+					changed = 1;
+					num_ops++;
+					i = -1; 
+				}
+				else
+				{
+					continue;
+				}
+			}
 		}
 
 		// something missing?
 		/* Step 3: free the lock */
+		pthread_mutex_unlock(&buffer_lock);
 
 		/* Step 6: check progress */
-
+		sem_wait(&progress_lock);
+		progress.group = changed ? 2 : 1;
+		sem_post(&progress_lock);
 		/* Step 5: let others play */
+		sched_yield();
 	}
 }
 
@@ -343,33 +388,34 @@ void *sentinel(void *arg)
 		}
 
 		// something missing?
-		/* Step 6: check for progress */
-if (timeToFinish()) {
+		pthread_mutex_unlock(&buffer_lock);
 
-	    return NULL;
-	}
-	
-    sem_wait(&progress_lock);
-    //Check if progress has been made **
-    if (progress.add == 1 ||
-       progress.mult == 1 ||
-       progress.group == 1)
-    {
-        //if progress was made, restart all flags**
-        progress.add = 0;
-        progress.mult = 0;
-        progress.group = 0;
-    }
-    //if no progress, verify deadlock.**
-    if(progress.add == 2&&
-       progress.mult == 2 &&
-       progress.group == 2)
-    {
-        printErrorAndExit("No progress can be made\n"); 
-    }
-    sem_post(&progress_lock);
+		/* Step 6: check for progress */
+		if (timeToFinish())
+		{
+
+			return NULL;
+		}
+
+		sem_wait(&progress_lock);
+		//Check if progress has been made **
+		if (progress.add == 1 || progress.mult == 1 || progress.group == 1)
+		{
+			//if progress was made, restart all flags**
+			progress.add = 0;
+			progress.mult = 0;
+			progress.group = 0;
+		}
+		//if no progress, verify deadlock.**
+		if (progress.add == 2 &&
+			progress.mult == 2 &&
+			progress.group == 2)
+		{
+			printErrorAndExit("No progress can be made\n");
+		}
+		sem_post(&progress_lock);
 		/* Step 5: let others play, too */
-		   sched_yield();
+		sched_yield();
 	}
 }
 
