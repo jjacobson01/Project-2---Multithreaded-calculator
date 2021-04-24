@@ -77,7 +77,7 @@ void *adder(void *arg)
 	int i;
 	char nstring[50];
 	int changed = 0;
-	return NULL; /* remove this line to let the loop start*/
+	//return NULL; /* remove this line to let the loop start*/
 
 	while (1)
 	{
