@@ -90,7 +90,8 @@ void *adder(void *arg)
 
 		if (timeToFinish())
 		{
-			pthread_mutex_unlock(&buffer_lock) return NULL;
+			pthread_mutex_unlock(&buffer_lock);
+			return NULL;
 		}
 
 		/* storing this prevents having to recalculate it in the loop */
