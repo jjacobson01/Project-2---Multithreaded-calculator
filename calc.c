@@ -153,7 +153,7 @@ void *adder(void *arg)
 
 		/* Step 6: check progress */
 		sem_wait(&progress_lock);
-		progress.add = changed ? 1 : 2;
+		progress.add = changed ? 2 : 1;
 		sem_post(&progress_lock);
 		/* Step 5: let others play */
 		sched_yield();
@@ -240,7 +240,7 @@ void *multiplier(void *arg)
 		pthread_mutex_unlock(&buffer_lock);
 		/* Step 6: check progress */
 		sem_wait(&progress_lock);
-		progress.add = changed ? 1 : 2;
+		progress.add = changed ? 2 : 1;
 		sem_post(&progress_lock);
 		/* Step 5: let others play */
 		sched_yield();
@@ -325,7 +325,7 @@ void *degrouper(void *arg)
 
 		/* Step 6: check progress */
 		sem_wait(&progress_lock);
-		progress.group = changed ? 1 : 2;
+		progress.group = changed ? 2 : 1;
 		sem_post(&progress_lock);
 		/* Step 5: let others play */
 		sched_yield();
