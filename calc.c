@@ -75,7 +75,7 @@ void *adder(void *arg)
 	int value1, value2;
 	int startOffset, remainderOffset;
 	char nstring[50];
-	int changed = 0;
+	int changed;
 	int i;
 
 	//return NULL; /* remove this line to let the loop start*/
@@ -114,8 +114,7 @@ void *adder(void *arg)
 					startOffset = i;
 					value1 = atoi(&buffer[i]);
 
-					//we keep going through the array and incrementing the index
-					//till we hit something that isn't a number
+					//increment i until reaching an index that is not a number.
 					while (isdigit(buffer[i]))
 					{
 						i++;
@@ -189,7 +188,7 @@ void *multiplier(void *arg)
 	int value1, value2;
 	int startOffset, remainderOffset;
 	int i;
-	int changed = 0;
+	int changed;
 	char nstring[50];
 
 	//return NULL; /* remove this line */
@@ -272,11 +271,12 @@ void *multiplier(void *arg)
 
 			// something missing?
 			/* Step 3: free the lock */
-			pthread_mutex_unlock(&buffer_lock);
-			/* Step 6: check progress */
 			sem_wait(&progress_lock);
 			progress.mult = changed ? 1 : 2;
+
 			sem_post(&progress_lock);
+			/* Step 6: check progress */
+			pthread_mutex_unlock(&buffer_lock);
 			changed = 0;
 			/* Step 5: let others play */
 			sched_yield();
@@ -375,7 +375,6 @@ void *degrouper(void *arg)
 			sem_wait(&progress_lock);
 			progress.group = changed ? 1 : 2; // 1 means changed, 2 didn't changed;
 			sem_post(&progress_lock);
-			changed = 0;
 			/* Step 5: let others play */
 			sched_yield();
 		}

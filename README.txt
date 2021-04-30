@@ -115,9 +115,6 @@ The above pseudocode is only a suggestion; your code may work
 differently.  For example, you could hunt for + or * in the expression,
 then check that there are "naked" numbers to the left and right.
 
-The shared variables at this point are num_ops and the buffer. If there is no synchronization or mutual exclusion,
- it is more than possible that these two variables will at one point become corrupted in the sense that the process 
- of operations would mess up the strings and the increments of num_ops would be incorrect.
 
 
 
@@ -130,10 +127,21 @@ Mutal exlusion/synchronization allow our processes to use required resources wit
 If neither is applied then it's highly likely that errors and corruption to our variables will happen. The increments would
 wrong and our buffer can malfunction causing a crash.
 
+
+
 Q2: Suppose we implement correct synchronization and mutual exclusion
 for all of the threads.  If our three functions were to operate on all
 expression in the buffer at once (not just the first expression), would
 the program generate incorrect output?  Why or why not?
+
+As far as I understand, mathematical expressions don't operate under PEMDAS, they calculate from left to right but 
+can prioritize expressions in parentheses first. Other than that there is no order of operations so having all three
+functions work  simultaneously to only calculate their correct portion of the expression should not work, it is strongly
+likely that the output will be incorrect. If PEMDAS was used I do see it being possible for each function to calculate 
+the expression correctly.
+
+
+
 
 
 Step 3: Critical Sections
@@ -158,13 +166,43 @@ synchronization errors (e.g., race conditions, data corruption).
 Q3: For this step, what specific data structure(s) need(s) protection?
 Why?
 
+I believe the only important data structure would be our array, buffer. It is what holds our expression and if the array
+isn't fully synced properly then our output will be incorrect. Our functions will not be able to impelement their 
+operators correctly if the array is in shambles, so protection is as must.
+
+
+
+
+
 Q4: What would happen if you had a busy-wait within one of your critical
 sections?  What if it is a loop with sched_yield()?
+
+Busy-wait is a bad practice that should not be used. If used in critical section then system resources will be wasted
+including the possibility of system failures to occur, it could help in quickly swapping processes once the first is complete,
+but the waste of cpu cycles and possiblity of system failure isn't worth it. The purpose of sched_yield is to yield the current
+running process if one in the queu is the same or higher priority. Sched_yield()'s purpose is to control which process goes in 
+the running state based on highest priority. With Busy-wait inside the loop of sched_yield() it may prove to be profitable by 
+enhancing the speed times of swapping out processes if the process is complete before sched_yield is called. But if the process
+takes a while to complete is use of resources then using a busy-wait will  still cause excessive use of cpu cycles.
+
+
+
+
 
 Q5: Why is it sometimes necessary to use the non-blocking
 pthread_mutex_trylock() instead of the blocking pthread_mutex_lock()?
 Think for example of a program that needs to acquire multiple mutexes at
 the same time.
+
+pthread_mutex_trylock() is necessary if you want to acquire ownership of a mutex without blocking it. Threads share it's
+information with it's peer threads, but if a thread becomes blocked than all peer threads become blocked too. With pthread_mutex_trylock()
+this will allow peer threads to still continue and share information since the mutex isn't blocked if it's currently locked.
+Upside to using pthread_mutex_trylock() if needing multiple mutexes is it won't cause a deadlock by blocking a resource that another
+thread needs.
+
+
+
+
 
 
 Step 4: Accounting
@@ -179,6 +217,15 @@ this variable is free from race conditions.
 
 Q6: Is a new mutex, separate from what you have in Step 3, required to
 correctly implement this behavior?  Why or why not?
+
+The only way to properly read the buffer and calculate the expression correctly is if a mutex is applied to refrain from other
+functions from accessing and using the resource. The same goes for data variables(num_ops), this allows num_ups to store the
+numer of operations in an organized manner without conflicts of multiple functions trying to use the variable at the same time.
+
+
+
+
+
 
 
 Step 5: Performance
