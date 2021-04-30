@@ -115,10 +115,20 @@ The above pseudocode is only a suggestion; your code may work
 differently.  For example, you could hunt for + or * in the expression,
 then check that there are "naked" numbers to the left and right.
 
+The shared variables at this point are num_ops and the buffer. If there is no synchronization or mutual exclusion,
+ it is more than possible that these two variables will at one point become corrupted in the sense that the process 
+ of operations would mess up the strings and the increments of num_ops would be incorrect.
+
+
+
 
 Q1: At this point, your solution does not contain any synchronization or
 mutual exclusion.  Give an example of and explain a possible
 synchronization error that could occur in this code. Be specific.
+
+Mutal exlusion/synchronization allow our processes to use required resources without interruption from other processes.
+If neither is applied then it's highly likely that errors and corruption to our variables will happen. The increments would
+wrong and our buffer can malfunction causing a crash.
 
 Q2: Suppose we implement correct synchronization and mutual exclusion
 for all of the threads.  If our three functions were to operate on all

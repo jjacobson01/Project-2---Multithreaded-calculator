@@ -114,7 +114,8 @@ void *adder(void *arg)
 					startOffset = i;
 					value1 = atoi(&buffer[i]);
 
-					//increment i until index reached is NOT a number
+					//we keep going through the array and incrementing the index
+					//till we hit something that isn't a number
 					while (isdigit(buffer[i]))
 					{
 						i++;
