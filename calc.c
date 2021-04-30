@@ -1,6 +1,6 @@
 /* Project 2 - Multithreaded calculator */
-// Name: Jonathan Jacobson
-// Partner Name: Jose Aguilar
+// Name: Jose Aguilar
+// Partner: Jonathon Jacobson
 
 #include "calc.h"
 
@@ -14,8 +14,8 @@ char buffer[BUF_SIZE];
 int num_ops;
 
 /* Step 3: add mutual exclusion */
-static pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Step 6: add condition flag varaibles */
 struct progress_t
 {
@@ -74,89 +74,107 @@ void *adder(void *arg)
 	int bufferlen;
 	int value1, value2;
 	int startOffset, remainderOffset;
-	int i;
 	char nstring[50];
 	int changed = 0;
+	int i;
+
 	//return NULL; /* remove this line to let the loop start*/
 
 	while (1)
 	{
-
-		/* Step 3: add mutual exclusion */
-		pthread_mutex_lock(&buffer_lock);
-
-		startOffset = remainderOffset = -1;
-		value1 = value2 = -1;
-
-		if (timeToFinish())
+		if (progress.add != 2)
 		{
-			pthread_mutex_unlock(&buffer_lock);
-			return NULL;
-		}
+			/* Step 3: add mutual exclusion */
+			pthread_mutex_lock(&buffer_lock);
 
-		/* storing this prevents having to recalculate it in the loop */
-		bufferlen = strlen(buffer);
+			startOffset = remainderOffset = -1;
+			value1 = value2 = -1;
 
-		/* Step 2: implement adder */
-		for (i = 0; i < bufferlen; i++)
-		{
-			// do we have value1 already?  If not, is this a "naked" number?
-			// if we do, is the next character after it a '+'?
-			// if so, is the next one after the sign a "naked" number?
-			if (isNumeric(buffer[i]))
+			if (timeToFinish())
 			{
-
-				value1 = atoi(&buffer[i]);
-
-				startOffset = i;
-
-				while (isdigit(buffer[i]))
-				{
-					i++;
-				}
-
-				if (buffer[i] != '+' || !isNumeric(buffer[i + 1]))
-				{
-					continue;
-				}
-				value2 = string2int(&buffer[i + 1]);
-				int result = value1 + value2;
-
-				do
-				{
-					i++;
-				} while (isNumeric(buffer[i]));
-				remainderOffset = i;
-
-				int2string(result, nstring);
-
-				char BufferBackup[500];
-				strcpy(BufferBackup, &buffer);
-
-				strcpy(buffer + startOffset, &nstring);
-
-				strcpy(buffer + (startOffset + strlen(nstring)), &BufferBackup[remainderOffset]);
-
-				bufferlen = bufferlen - (remainderOffset - 1 - startOffset); //5(35+5)-6  < So: 2 rm:6
-				i = startOffset - 1;										 ///2+4*6*9 [i=6] > 2+24*9 [i=3 *] >
-
-				changed = 1;
-				num_ops++;
+				pthread_mutex_unlock(&buffer_lock);
+				return NULL;
 			}
-			// once we have value1, value2 and start and end offsets of the
-			// expression in buffer, replace it with v1+v2
+
+			/* storing this prevents having to recalculate it in the loop */
+			bufferlen = strlen(buffer);
+
+			/* Step 2: implement adder */
+			for (i = 0; i < bufferlen; i++)
+			{
+				// do we have value1 already?  If not, is this a "naked" number?
+				// if we do, is the next character after it a '+'?
+				// if so, is the next one after the sign a "naked" number?
+
+				//first we make sure that we even have a number in the buffer
+				//and point the buffer to our value1 for reference
+				if (isNumeric(buffer[i]))
+				{
+					//this is where we start off the first variable
+					startOffset = i;
+					value1 = atoi(&buffer[i]);
+
+					//increment i until index reached is NOT a number
+					while (isdigit(buffer[i]))
+					{
+						i++;
+					}
+
+					//this is our signal that we hit the midway point of the adder
+					//operation or the next different operation
+					if (buffer[i] != '+' || !isNumeric(buffer[i + 1]))
+					{
+						continue;
+					}
+					value2 = string2int(&buffer[i + 1]);
+
+					// once we have value1, value2 and start and end offsets of the
+					// expression in buffer, replace it with v1+v2
+
+					int result = value1 + value2;
+					//we keep incremeting the index till we reach the true end of the array
+					//or the next operation
+					do
+					{
+						i++;
+					} while (isNumeric(buffer[i]));
+					remainderOffset = i;
+
+					int2string(result, nstring);
+
+					//we clone the buffer to modify it to have the result
+					char bufferclone[1000];
+					strcpy(bufferclone, &buffer);
+
+					//we go into the buffer and copy over the result of the
+					//operation
+					strcpy(buffer + startOffset, &nstring);
+
+					//then we copy over the remainder due to the original buffer becoming modified
+					strcpy(buffer + (startOffset + strlen(nstring)), &bufferclone[remainderOffset]);
+
+					bufferlen = bufferlen - (remainderOffset - 1 - startOffset);
+					i = startOffset - 1;
+					changed = 1;
+					num_ops++;
+				}
+			}
+
+			// something missing?
+			/* Step 3: free the lock */
+			pthread_mutex_unlock(&buffer_lock);
+			/* Step 6: check progress */
+			sem_wait(&progress_lock);
+			progress.add = changed ? 1 : 2;
+			sem_post(&progress_lock);
+			changed = 0;
+			/* Step 5: let others play */
+			sched_yield();
 		}
-
-		// something missing?
-		/* Step 3: free the lock */
-		pthread_mutex_unlock(&buffer_lock);
-
-		/* Step 6: check progress */
-		sem_wait(&progress_lock);
-		progress.add = changed ? 2 : 1;
-		sem_post(&progress_lock);
-		/* Step 5: let others play */
-		sched_yield();
+		else
+		{
+			sched_yield();
+		}
 	}
 }
 
@@ -167,83 +185,105 @@ void *adder(void *arg)
 void *multiplier(void *arg)
 {
 	int bufferlen;
-	int changed;
 	int value1, value2;
 	int startOffset, remainderOffset;
 	int i;
-
+	int changed = 0;
 	char nstring[50];
 
 	//return NULL; /* remove this line */
 
 	while (1)
 	{
-		/* Step 3: add mutual exclusion */
-		pthread_mutex_unlock(&buffer_lock);
 
-		startOffset = remainderOffset = -1;
-		value1 = value2 = -1;
-
-		if (timeToFinish())
+		if (progress.mult != 2)
 		{
-			pthread_mutex_unlock(&buffer_lock);
-			return NULL;
-		}
+			/* Step 3: add mutual exclusion */
+			pthread_mutex_lock(&buffer_lock);
+			startOffset = remainderOffset = -1;
+			value1 = value2 = -1;
 
-		/* storing this prevents having to recalculate it in the loop */
-		bufferlen = strlen(buffer);
-
-		/* Step 2: implement multiplier */
-		for (i = 0; i < bufferlen; i++)
-		{
-			// same as adder, but v1*v2
-			if (isNumeric(buffer[i]))
+			if (timeToFinish())
 			{
-				startOffset = i;
-
-				value1 = atoi(&buffer[i]);
-
-				while (isdigit(buffer[i]))
-				{
-					i++;
-				}
-
-				if (buffer[i] != '*' || !isNumeric(buffer[i + 1]))
-				{
-					continue;
-				}
-				value2 = string2int(&buffer[i + 1]);
-				int result = value1 * value2;
-
-				do
-				{
-					i++;
-				} while (isNumeric(buffer[i]));
-				remainderOffset = i;
-
-				int2string(result, nstring);
-				strncpy(buffer + startOffset, &nstring[0], strlen(nstring));
-				strcpy(buffer + startOffset + strlen(nstring), buffer + remainderOffset);
-
-				bufferlen = bufferlen - (remainderOffset - 1 - startOffset); //5(35+5)-6  < So: 2 rm:6
-				i = startOffset - 1;										 ///2+4*6*9 [i=6] > 2+24*9 [i=3 *] >
-
-				startOffset = 0;
-				remainderOffset = 0;
-				changed = 1;
-				num_ops++;
+				pthread_mutex_unlock(&buffer_lock);
+				return NULL;
 			}
-		}
 
-		// something missing?
-		/* Step 3: free the lock */
-		pthread_mutex_unlock(&buffer_lock);
-		/* Step 6: check progress */
-		sem_wait(&progress_lock);
-		progress.add = changed ? 2 : 1;
-		sem_post(&progress_lock);
-		/* Step 5: let others play */
-		sched_yield();
+			/* storing this prevents having to recalculate it in the loop */
+			bufferlen = strlen(buffer);
+
+			/* Step 2: implement multiplier */
+			for (i = 0; i < bufferlen; i++)
+			{
+				// do we have value1 already?  If not, is this a "naked" number?
+				// if we do, is the next character after it a '+'?
+				// if so, is the next one after the sign a "naked" number?
+
+				//first we make sure that we even have a number in the buffer
+				//and point the buffer to our value1 for reference
+				if (isNumeric(buffer[i]))
+				{
+					//this is where we start off the first variable
+					startOffset = i;
+					value1 = atoi(&buffer[i]);
+
+					//we keep going through the array and incrementing the index
+					//till we hit something that isn't a number
+					while (isNumeric(buffer[i]))
+					{
+						i++;
+					}
+
+					//this is our signal that we hit the midway point of the adder
+					//operation or the next different operation
+					if (buffer[i] != '*' || !isNumeric(buffer[i + 1]))
+					{
+						continue;
+					}
+					value2 = string2int(&buffer[i + 1]);
+
+					// once we have value1, value2 and start and end offsets of the
+					// expression in buffer, replace it with v1+v2
+
+					int result = value1 * value2;
+					//we keep incremeting the index till we reach the true end of the array
+					//or the next operation
+					do
+					{
+						i++;
+					} while (isNumeric(buffer[i]));
+					remainderOffset = i;
+
+					int2string(result, nstring);
+					int2string(result, nstring);
+					strncpy(buffer + startOffset, &nstring[0], strlen(nstring));
+					strcpy(buffer + startOffset + strlen(nstring), buffer + remainderOffset);
+
+					bufferlen = bufferlen - (remainderOffset - 1 - startOffset);
+					i = startOffset - 1;
+
+					startOffset = 0;
+					remainderOffset = 0;
+					changed = 1;
+					num_ops++;
+				}
+			}
+
+			// something missing?
+			/* Step 3: free the lock */
+			pthread_mutex_unlock(&buffer_lock);
+			/* Step 6: check progress */
+			sem_wait(&progress_lock);
+			progress.mult = changed ? 1 : 2;
+			sem_post(&progress_lock);
+			changed = 0;
+			/* Step 5: let others play */
+			sched_yield();
+		}
+		else
+		{
+			sched_yield();
+		}
 	}
 }
 
@@ -251,10 +291,8 @@ void *multiplier(void *arg)
    "(56)"] in the buffer and, if found, removes the parentheses leaving
    only the surrounded number. */
 void *degrouper(void *arg)
-
 {
-	int startOffset;
-	int remainderOffset;
+	int startOffset, remainderOffset;
 	int bufferlen;
 	int changed;
 	int i;
@@ -264,71 +302,86 @@ void *degrouper(void *arg)
 	while (1)
 	{
 
-		/* Step 3: add mutual exclusion */
-		pthread_mutex_lock(&buffer_lock);
-		if (timeToFinish())
+		if (progress.group != 2)
 		{
-			return NULL;
-		}
+			/* Step 3: add mutual exclusion */
 
-		/* storing this prevents having to recalculate it in the loop */
-		bufferlen = strlen(buffer);
+			pthread_mutex_lock(&buffer_lock);
 
-		/* Step 2: implement degrouper */
-		for (i = 0; i < bufferlen; i++)
-		{
-			// check for '(' followed by a naked number followed by ')'
-			if (buffer[i] == '(')
+			if (timeToFinish())
 			{
-				startOffset = i;
+				return NULL;
+			}
 
-				if (!isNumeric(buffer[i + 1]))
+			/* storing this prevents having to recalculate it in the loop */
+			bufferlen = strlen(buffer);
+
+			/* Step 2: implement degrouper */
+			for (i = 0; i < bufferlen; i++)
+			{
+
+				// check for '(' followed by a naked number followed by ')'
+				// remove ')' by shifting the tail end of the expression
+				// remove '(' by shifting the beginning of the expression
+
+				//here we find the indicator that this is a degrouper function
+				//that being the '(' in the buffer
+				if (buffer[i] == '(')
 				{
-					continue;
-				}
 
-				do
-				{
-					i++;
-				} while (isNumeric(buffer[i]));
-				//printf(buffer+i);
-				;
-				if (buffer[i] == ')')
-				{ 
-					remainderOffset = i;
-					// remove ')' by shifting the tail end of the expression
-					// remove '(' by shifting the beginning of the expression
-					char BufferBackup[500];
-					strcpy(BufferBackup, &buffer);
+					//at that point we save the index  for starting reference
+					startOffset = i;
+					if (!isNumeric(buffer[i + 1]))
+					{
+						continue;
+					}
 
+					//we keep loopinng through the indeces till we find
+					//one that is the other )
+					do
+					{
+						i++;
+					} while (isNumeric(buffer[i]));
+					;
 
-					strcpy(buffer + (startOffset), buffer + (startOffset + 1));
+					//we find the ) and remove both
+					if (buffer[i] == ')')
+					{
+						remainderOffset = i;
+						char bufferclone[1000];
+						strcpy(bufferclone, &buffer);
 
-					strcpy(buffer + remainderOffset - 1, buffer + (remainderOffset)); 
+						strcpy(buffer + (startOffset), buffer + (startOffset + 1));
 
-
-					bufferlen = bufferlen - 2;
-					changed = 1;
-					num_ops++;
-					i = -1; 
-				}
-				else
-				{
-					continue;
+						strcpy(buffer + remainderOffset - 1, buffer + (remainderOffset));
+						bufferlen = bufferlen - 2;
+						changed = 1;
+						num_ops++;
+						i = -1;
+					}
+					else
+					{
+						continue;
+					}
 				}
 			}
+
+			// something missing?
+			/* Step 3: free the lock */
+			pthread_mutex_unlock(&buffer_lock);
+
+			/* Step 6: check progress */
+			sem_wait(&progress_lock);
+			progress.group = changed ? 1 : 2; // 1 means changed, 2 didn't changed;
+			sem_post(&progress_lock);
+			changed = 0;
+			/* Step 5: let others play */
+			sched_yield();
 		}
-
-		// something missing?
-		/* Step 3: free the lock */
-		pthread_mutex_unlock(&buffer_lock);
-
-		/* Step 6: check progress */
-		sem_wait(&progress_lock);
-		progress.group = changed ? 2 : 1;
-		sem_post(&progress_lock);
-		/* Step 5: let others play */
-		sched_yield();
+		else
+		{
+			sched_yield();
+		}
 	}
 }
 
@@ -349,6 +402,7 @@ void *sentinel(void *arg)
 	{
 
 		/* Step 3: add mutual exclusion */
+
 		pthread_mutex_lock(&buffer_lock);
 		if (timeToFinish())
 		{
@@ -388,25 +442,24 @@ void *sentinel(void *arg)
 		}
 
 		// something missing?
-		pthread_mutex_unlock(&buffer_lock);
 
+		pthread_mutex_unlock(&buffer_lock);
 		/* Step 6: check for progress */
+
 		if (timeToFinish())
 		{
-
 			return NULL;
 		}
 
 		sem_wait(&progress_lock);
-		//Check if progress has been made **
-		if (progress.add == 1 || progress.mult == 1 || progress.group == 1)
+		if (progress.add == 1 ||
+			progress.mult == 1 ||
+			progress.group == 1)
 		{
-			//if progress was made, restart all flags**
 			progress.add = 0;
 			progress.mult = 0;
 			progress.group = 0;
 		}
-		//if no progress, verify deadlock.**
 		if (progress.add == 2 &&
 			progress.mult == 2 &&
 			progress.group == 2)
@@ -414,6 +467,7 @@ void *sentinel(void *arg)
 			printErrorAndExit("No progress can be made\n");
 		}
 		sem_post(&progress_lock);
+
 		/* Step 5: let others play, too */
 		sched_yield();
 	}
@@ -477,8 +531,10 @@ int smp3_main(int argc, char **argv)
 	void *arg = 0; /* dummy value */
 
 	/* Step 7: initialize your semaphore */
+
 	sem_init(&progress_lock, 0, 1);
 	pthread_mutex_lock(&buffer_lock);
+
 	/* let's create our threads */
 	if (pthread_create(&multiplierThread, NULL, multiplier, arg) || pthread_create(&adderThread, NULL, adder, arg) || pthread_create(&degrouperThread, NULL, degrouper, arg) || pthread_create(&sentinelThread, NULL, sentinel, arg) || pthread_create(&readerThread, NULL, reader, arg))
 	{
@@ -490,14 +546,19 @@ int smp3_main(int argc, char **argv)
 	for processes. A call to pthread_join blocks the calling thread until 
 	the thread with identifier equal to the first argument terminates.*/
 	// If you join do not detach.
+
+	pthread_detach(readerThread);
 	pthread_detach(multiplierThread);
 	pthread_detach(adderThread);
 	pthread_detach(degrouperThread);
-	//pthread_detach(sentinelThread);
-	pthread_detach(readerThread);
 	/* Step 1: we have to join on the ________ thread. */
 	// pthread_join(____, NULL);
+
 	pthread_join(sentinelThread, NULL);
+
+	//we need to join the main thread that can access and execute all the others
+	//from the ones displayed, they all provide a singular function that needs
+	// the others to complete a "calculator"
 
 	/* everything is finished, print out the number of operations performed */
 	fprintf(stdout, "Performed a total of %d operations\n", num_ops);
