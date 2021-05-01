@@ -239,10 +239,29 @@ sched_yield() calls at the appropriate place inside these loops.
 Q7: Why is it important, even on single-processor machines, to keep the
 critical sections as small as possible?
 
+Based on online research the best conclusion I have as to why it's important to keep critical sections as small as possible
+is to idle time wait by other threads/processes and to reduce chances of contention.
+
+ 
+
+
+
+
+
 Q8: Why is spin-waiting without yielding usually inefficient?
+
+Spin-waiting is the same is Busy-waiting then without yielding the amount of time spent on spin-waitining will increase the amount
+of CPU cycles wasted which in tern reduces the amount of resources that can be used.
+
+
+
 
 Q9: When might spin-waiting without yielding or blocking actually be
 *more* efficient?
+It's more efficient if the amount of time that a process/thread inside the mutex/critical section is very short. The shorter
+the process/thread spends the less CPU cycles used and also the faster that the process/threads swap out.
+
+
 
 
 Step 6: Monitoring Progress
@@ -289,6 +308,11 @@ one of them fails.
 Q10:  You have to supply an initial value when creating a semaphore.
 Which value should you use to mimic the default functionality of a mutex?
 What would happen if you specified a larger value?
+
+Although mutex is meant as a locking mechanism and a semaphore is more for signalling mechanism, 
+the closest you can get for a semphore to act like a mutex is to use it as binary allowing 
+1 or 0 to control whether the mutex/critical section is locked or unlocked. 
+
 
 
 Testing
